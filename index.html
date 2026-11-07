@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="NotepadPro" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <title>Call Center Notepad Pro</title>
     <meta name="description" content="An advanced, Microsoft Notepad-inspired workspace for call center agents featuring one-click scenario generators, structured notation templates, quick-line inserts, custom snippets, and persistent call checklists." />
     <meta property="og:title" content="Call Center Notepad Pro" />
@@ -34,17 +35,16 @@
             link.href = './public/gh-bundle.css';
             document.head.appendChild(link);
 
-            var manifestLink = document.createElement('link');
-            manifestLink.rel = 'manifest';
-            manifestLink.href = './public/manifest.webmanifest';
-            document.head.appendChild(manifestLink);
-
             var script = document.createElement('script');
             script.type = 'module';
             script.src = './public/gh-bundle.js';
             document.body.appendChild(script);
+
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('./sw.js').catch(function () {});
+            }
           }
-        }, 150);
+        }, 120);
       });
     </script>
   </body>
