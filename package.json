@@ -1,7 +1,10 @@
 {
-  "name": "react-example",
+  "name": "call-center-notepad-pro",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Call Center Notepad Pro — Fast, structured call center notation tool",
+  "author": "Call Center Notepad Pro",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",

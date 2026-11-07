@@ -803,12 +803,40 @@ export default function App() {
 
   /**
    * Pressing a Notation Type button (Type 1 – Type 4 or Free Note):
-   * ALWAYS generates a new separate NoteEntry below existing notes
-   * with its own 4 clickable checklists below it.
+   * - If the active note is a Free Note and the user presses Type 1 – Type 4,
+   *   generates that notation template directly inside the Free Note.
+   * - Otherwise generates a new separate NoteEntry below existing notes
+   *   with its own 4 clickable checklists below it.
    * NEVER deletes or overwrites previous notes!
    */
   const handleGenerateNotationType = (type: TemplateType) => {
     setSelectedTemplate(type);
+
+    if (type !== 'free' && noteEntries.length > 0) {
+      const targetIndex =
+        activeNoteId && noteEntries.some((n) => n.id === activeNoteId)
+          ? noteEntries.findIndex((n) => n.id === activeNoteId)
+          : noteEntries.length - 1;
+      const targetNote = noteEntries[targetIndex];
+
+      if (targetNote && targetNote.templateType === 'free') {
+        const templateText = buildTemplateText(type, '');
+        const trimmedExisting = targetNote.text.trimEnd();
+        const updatedText = trimmedExisting
+          ? `${trimmedExisting}\n\n${templateText}`
+          : templateText;
+        const updatedEntries = noteEntries.map((entry, idx) =>
+          idx === targetIndex ? { ...entry, text: updatedText } : entry
+        );
+        pushUndoAndSetEntries(
+          updatedEntries,
+          targetNote.id,
+          `Added Type ${type} Template into Free Note #${targetIndex + 1}`
+        );
+        return;
+      }
+    }
+
     const newEntry: NoteEntry = {
       id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       templateType: type,
@@ -864,21 +892,6 @@ export default function App() {
         : noteEntries.length - 1;
 
     const targetNote = noteEntries[targetIndex];
-
-    if (targetNote.templateType === 'free') {
-      const trimmed = targetNote.text.trimEnd();
-      const updatedText = trimmed ? `${trimmed}\n${sentence}` : sentence;
-      const updatedEntries = noteEntries.map((entry, idx) =>
-        idx === targetIndex ? { ...entry, text: updatedText } : entry
-      );
-      pushUndoAndSetEntries(
-        updatedEntries,
-        targetNote.id,
-        `Added ${item.shortLabel} to Note #${targetIndex + 1}`
-      );
-      return;
-    }
-
     const reasonLineRegex =
       /^(REASON FOR CALLING|Reason for Calling):[ \t]*(.*)$/m;
 
@@ -900,6 +913,17 @@ export default function App() {
         updatedEntries,
         targetNote.id,
         `Added to Reason in Note #${targetIndex + 1}`
+      );
+    } else if (targetNote.templateType === 'free') {
+      const trimmed = targetNote.text.trimEnd();
+      const updatedText = trimmed ? `${trimmed}\n${sentence}` : sentence;
+      const updatedEntries = noteEntries.map((entry, idx) =>
+        idx === targetIndex ? { ...entry, text: updatedText } : entry
+      );
+      pushUndoAndSetEntries(
+        updatedEntries,
+        targetNote.id,
+        `Added ${item.shortLabel} to Free Note #${targetIndex + 1}`
       );
     } else {
       // Append a new note block with the scenario sentence

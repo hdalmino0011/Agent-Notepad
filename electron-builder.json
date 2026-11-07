@@ -1,0 +1,37 @@
+{
+  "appId": "com.callcenter.notepadpro",
+  "productName": "Call Center Notepad Pro",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json",
+    "!node_modules/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      },
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/pwa-512x512.png"
+  },
+  "portable": {
+    "artifactName": "Call-Center-Notepad-Pro-Portable.exe"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "artifactName": "Call-Center-Notepad-Pro-Setup.exe"
+  }
+}

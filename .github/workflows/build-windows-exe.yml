@@ -1,0 +1,46 @@
+name: Build Windows Desktop App (.exe)
+
+on:
+  push:
+    branches: ['main', 'master']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build web assets with Vite
+        run: npm run build
+
+      - name: Install Electron & Electron Builder
+        run: npm install --no-save --legacy-peer-deps electron@^35.0.0 electron-builder@^26.0.12
+
+      - name: Prepare package.json for lightweight Electron packaging
+        run: node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); delete pkg.dependencies; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
+      - name: Package Windows .exe (Portable & Setup Installer)
+        run: npx electron-builder --win --x64 --config electron-builder.json --publish never
+
+      - name: Upload Windows .exe Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Call-Center-Notepad-Pro-Windows-EXE
+          path: |
+            release/Call-Center-Notepad-Pro-Portable.exe
+            release/Call-Center-Notepad-Pro-Setup.exe
+          if-no-files-found: error
+          retention-days: 90
