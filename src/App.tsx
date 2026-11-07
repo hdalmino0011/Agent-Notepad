@@ -506,25 +506,19 @@ export default function App() {
 
   const [containerWidth, setContainerWidth] = useState<number>(() => {
     try {
-      if (
-        typeof window !== 'undefined' &&
-        (Boolean(window.electronAPI?.isElectron) ||
-          window.navigator.userAgent.includes('Electron') ||
-          window.location.protocol === 'file:')
-      ) {
-        return Math.max(240, window.innerWidth || 360);
-      }
       const saved = Number(localStorage.getItem(STORAGE_KEYS.CONTAINER_WIDTH));
-      return saved >= 240 && saved <= 1600 ? saved : 360;
+      return saved >= 220 && saved <= 1800 ? saved : 360;
     } catch {
       return 360;
     }
   });
 
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
+
   const [topPaneHeight, setTopPaneHeight] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem(STORAGE_KEYS.TOP_PANE_HEIGHT));
-      return saved >= 70 && saved <= 900 ? saved : 210;
+      return saved >= 60 && saved <= 900 ? saved : 210;
     } catch {
       return 210;
     }
@@ -533,21 +527,14 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem(STORAGE_KEYS.SIDEBAR_WIDTH));
-      return saved >= 160 && saved <= 900 ? saved : 300;
+      return saved >= 150 && saved <= 900 ? saved : 300;
     } catch {
       return 300;
     }
   });
 
-  // In the native Windows .exe app, automatically track mouse window resizing
-  useEffect(() => {
-    if (!isNativeDesktop) return;
-    const handleNativeWindowResize = () => {
-      setContainerWidth(Math.max(240, window.innerWidth));
-    };
-    window.addEventListener('resize', handleNativeWindowResize);
-    return () => window.removeEventListener('resize', handleNativeWindowResize);
-  }, [isNativeDesktop]);
+  // Optional custom heights per note id when resized with the mouse
+  const [noteHeights, setNoteHeights] = useState<Record<string, number>>({});
 
   const [customSnippets, setCustomSnippets] = useState<CustomSnippet[]>(() => {
     try {
@@ -665,69 +652,187 @@ export default function App() {
     }, 1800);
   };
 
-  // Drag resize handlers (supports both browser drag and native .exe mouse resizing)
-  const startContainerWidthDrag = (e: React.MouseEvent) => {
+  // Pointer-captured drag resize handlers so mouse dragging never loses focus
+  const startContainerWidthDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
     const startX = e.clientX;
     const startWidth = containerWidth || window.innerWidth;
-    const onMove = (moveEvent: MouseEvent) => {
-      const maxAllowed = isNativeDesktop ? 1920 : window.innerWidth;
+
+    const onMove = (moveEvent: PointerEvent) => {
       const next = Math.max(
-        240,
-        Math.min(maxAllowed, startWidth + (moveEvent.clientX - startX))
+        220,
+        Math.min(window.innerWidth, startWidth + (moveEvent.clientX - startX))
       );
       setContainerWidth(next);
-      if (isNativeDesktop && window.electronAPI?.setWindowWidth) {
-        window.electronAPI.setWindowWidth(next);
+    };
+    const onUp = (upEvent: PointerEvent) => {
+      if (target.hasPointerCapture(upEvent.pointerId)) {
+        target.releasePointerCapture(upEvent.pointerId);
       }
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
     };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
   };
 
-  const startTopPaneHeightDrag = (e: React.MouseEvent) => {
+  const startContainerHeightDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    const startY = e.clientY;
+    const startHeight = containerHeight || window.innerHeight;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = Math.max(
+        260,
+        Math.min(window.innerHeight, startHeight + (moveEvent.clientY - startY))
+      );
+      setContainerHeight(next);
+    };
+    const onUp = (upEvent: PointerEvent) => {
+      if (target.hasPointerCapture(upEvent.pointerId)) {
+        target.releasePointerCapture(upEvent.pointerId);
+      }
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
+    };
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
+  };
+
+  const startContainerCornerDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = containerWidth || window.innerWidth;
+    const startHeight = containerHeight || window.innerHeight;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextW = Math.max(
+        220,
+        Math.min(window.innerWidth, startWidth + (moveEvent.clientX - startX))
+      );
+      const nextH = Math.max(
+        260,
+        Math.min(window.innerHeight, startHeight + (moveEvent.clientY - startY))
+      );
+      setContainerWidth(nextW);
+      setContainerHeight(nextH);
+    };
+    const onUp = (upEvent: PointerEvent) => {
+      if (target.hasPointerCapture(upEvent.pointerId)) {
+        target.releasePointerCapture(upEvent.pointerId);
+      }
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
+    };
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
+  };
+
+  const startTopPaneHeightDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
     const startY = e.clientY;
     const startH = topPaneHeight;
-    const onMove = (moveEvent: MouseEvent) => {
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const maxH = Math.max(120, (containerHeight || window.innerHeight) - 110);
       const next = Math.max(
-        70,
-        Math.min(window.innerHeight - 120, startH + (moveEvent.clientY - startY))
+        60,
+        Math.min(maxH, startH + (moveEvent.clientY - startY))
       );
       setTopPaneHeight(next);
     };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+    const onUp = (upEvent: PointerEvent) => {
+      if (target.hasPointerCapture(upEvent.pointerId)) {
+        target.releasePointerCapture(upEvent.pointerId);
+      }
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
   };
 
-  const startSidebarWidthDrag = (e: React.MouseEvent) => {
+  const startSidebarWidthDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
     const startX = e.clientX;
     const startW = sidebarWidth;
-    const onMove = (moveEvent: MouseEvent) => {
+
+    const onMove = (moveEvent: PointerEvent) => {
       const next = Math.max(
-        160,
+        140,
         Math.min(
-          Math.max(400, window.innerWidth - 160),
+          Math.max(300, window.innerWidth - 140),
           startW + (moveEvent.clientX - startX)
         )
       );
       setSidebarWidth(next);
     };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+    const onUp = (upEvent: PointerEvent) => {
+      if (target.hasPointerCapture(upEvent.pointerId)) {
+        target.releasePointerCapture(upEvent.pointerId);
+      }
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
+  };
+
+  const startNoteHeightDrag = (
+    noteId: string,
+    initialHeight: number,
+    e: React.PointerEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    const startY = e.clientY;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = Math.max(
+        70,
+        Math.min(800, initialHeight + (moveEvent.clientY - startY))
+      );
+      setNoteHeights((prev) => ({ ...prev, [noteId]: next }));
+    };
+    const onUp = (upEvent: PointerEvent) => {
+      if (target.hasPointerCapture(upEvent.pointerId)) {
+        target.releasePointerCapture(upEvent.pointerId);
+      }
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
+    };
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
   };
 
   const applyHeaderCasing = (rawBlock: string): string => {
@@ -1248,12 +1353,13 @@ export default function App() {
           RESIZABLE APPLICATION SHELL
           ===================================================================== */}
       <div
-        style={
-          isVertical
-            ? { width: `${containerWidth}px`, maxWidth: '100vw' }
-            : { width: '100%' }
-        }
-        className="relative h-full flex flex-col bg-white dark:bg-slate-900 border-r border-slate-300 dark:border-slate-800 shadow-xl"
+        style={{
+          width: isVertical ? `${containerWidth}px` : '100%',
+          maxWidth: '100vw',
+          height: containerHeight ? `${containerHeight}px` : '100%',
+          maxHeight: '100vh',
+        }}
+        className="relative flex flex-col bg-white dark:bg-slate-900 border-r border-b border-slate-300 dark:border-slate-800 shadow-xl"
       >
         {/* TOP COMPACT HEADER: Brand + PWA Install + Width/Layout Controls + Theme */}
         <header className="shrink-0 px-2.5 py-1.5 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 flex items-center justify-between gap-1.5">
@@ -1620,19 +1726,19 @@ export default function App() {
           {/* DRAGGABLE SPLITTER BETWEEN BUTTONS & NOTEPAD */}
           {isVertical ? (
             <div
-              onMouseDown={startTopPaneHeightDrag}
-              title="Drag up or down to resize buttons area"
-              className="shrink-0 h-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-blue-500/50 cursor-row-resize flex items-center justify-center transition-colors"
+              onPointerDown={startTopPaneHeightDrag}
+              title="Drag up or down with mouse to resize buttons area"
+              className="shrink-0 h-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-blue-500/60 active:bg-blue-600 cursor-row-resize flex items-center justify-center transition-colors touch-none z-20"
             >
-              <GripHorizontal className="w-3 h-3 text-slate-400" />
+              <GripHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-300 pointer-events-none" />
             </div>
           ) : (
             <div
-              onMouseDown={startSidebarWidthDrag}
-              title="Drag left or right to resize sidebar"
-              className="shrink-0 w-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-blue-500/50 cursor-col-resize flex items-center justify-center transition-colors"
+              onPointerDown={startSidebarWidthDrag}
+              title="Drag left or right with mouse to resize sidebar"
+              className="shrink-0 w-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-blue-500/60 active:bg-blue-600 cursor-col-resize flex items-center justify-center transition-colors touch-none z-20"
             >
-              <GripVertical className="w-3 h-3 text-slate-400" />
+              <GripVertical className="w-3.5 h-3.5 text-slate-500 dark:text-slate-300 pointer-events-none" />
             </div>
           )}
 
@@ -1804,6 +1910,11 @@ export default function App() {
                       <textarea
                         value={entry.text}
                         rows={lineCount}
+                        style={
+                          noteHeights[entry.id]
+                            ? { height: `${noteHeights[entry.id]}px` }
+                            : undefined
+                        }
                         placeholder={
                           entry.templateType === 'free'
                             ? 'Write your note here...'
@@ -1817,6 +1928,21 @@ export default function App() {
                         aria-label={`Call note ${idx + 1}`}
                         className="w-full resize-y border-0 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-mono text-[12.5px] leading-[1.55] p-2.5 focus:outline-none selection:bg-blue-600 selection:text-white select-text block"
                       />
+
+                      {/* Draggable Note Height Handle */}
+                      <div
+                        onPointerDown={(e) =>
+                          startNoteHeightDrag(
+                            entry.id,
+                            noteHeights[entry.id] ?? lineCount * 20 + 20,
+                            e
+                          )
+                        }
+                        title="Drag up or down to resize this note box"
+                        className="h-2 bg-slate-100 dark:bg-slate-900 hover:bg-blue-500/40 active:bg-blue-600 cursor-ns-resize flex items-center justify-center border-t border-slate-200/70 dark:border-slate-800/70 touch-none"
+                      >
+                        <div className="w-8 h-0.5 rounded-full bg-slate-300 dark:bg-slate-700 pointer-events-none" />
+                      </div>
 
                       {/* =======================================================
                           4 CLICKABLE-ONLY CHECKLISTS BELOW EVERY GENERATED NOTE
@@ -1876,13 +2002,29 @@ export default function App() {
         {/* DRAGGABLE RIGHT-EDGE WIDTH HANDLE */}
         {isVertical && (
           <div
-            onMouseDown={startContainerWidthDrag}
-            title="Drag left or right to resize tool width"
-            className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-blue-500/40 flex items-center justify-center group z-30"
+            onPointerDown={startContainerWidthDrag}
+            title="Drag left or right with mouse to resize tool width"
+            className="absolute top-0 right-0 w-2.5 h-full cursor-ew-resize bg-transparent hover:bg-blue-500/40 active:bg-blue-600/60 flex items-center justify-center group z-30 touch-none"
           >
-            <div className="w-0.5 h-10 bg-slate-300 dark:bg-slate-700 group-hover:bg-blue-500 rounded-full" />
+            <div className="w-1 h-12 bg-slate-400/70 dark:bg-slate-600 group-hover:bg-blue-500 rounded-full pointer-events-none" />
           </div>
         )}
+
+        {/* DRAGGABLE BOTTOM-EDGE HEIGHT HANDLE */}
+        <div
+          onPointerDown={startContainerHeightDrag}
+          title="Drag up or down with mouse to resize tool height"
+          className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize bg-transparent hover:bg-blue-500/40 active:bg-blue-600/60 z-30 touch-none"
+        />
+
+        {/* DRAGGABLE BOTTOM-RIGHT CORNER 2D HANDLE */}
+        <div
+          onPointerDown={startContainerCornerDrag}
+          title="Drag corner diagonally to resize both width and height"
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize bg-slate-300/80 dark:bg-slate-700/80 hover:bg-blue-500 z-40 rounded-tl flex items-center justify-center touch-none"
+        >
+          <div className="w-1.5 h-1.5 border-r-2 border-b-2 border-slate-600 dark:border-slate-200 pointer-events-none" />
+        </div>
 
         {/* iOS PWA Installation Guide Modal */}
         {showIOSGuide && (

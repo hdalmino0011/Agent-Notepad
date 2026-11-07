@@ -4,7 +4,6 @@ const fs = require('fs');
 
 let mainWindow = null;
 
-// Persist user's custom window size & position across launches
 function getBoundsFilePath() {
   return path.join(app.getPath('userData'), 'window-bounds.json');
 }
@@ -17,8 +16,8 @@ function loadSavedBounds() {
       if (
         typeof data.width === 'number' &&
         typeof data.height === 'number' &&
-        data.width >= 240 &&
-        data.height >= 280
+        data.width >= 220 &&
+        data.height >= 240
       ) {
         return data;
       }
@@ -26,7 +25,7 @@ function loadSavedBounds() {
   } catch {
     // ignore
   }
-  return { width: 375, height: 760 };
+  return { width: 380, height: 760 };
 }
 
 function saveCurrentBounds() {
@@ -49,12 +48,14 @@ function createWindow() {
     height: savedBounds.height,
     x: typeof savedBounds.x === 'number' ? savedBounds.x : undefined,
     y: typeof savedBounds.y === 'number' ? savedBounds.y : undefined,
-    minWidth: 240,
-    minHeight: 280,
+    minWidth: 220,
+    minHeight: 240,
     resizable: true,
     minimizable: true,
     maximizable: true,
     fullscreenable: true,
+    frame: true,
+    thickFrame: true,
     title: 'Call Center Notepad Pro',
     icon: path.join(__dirname, '../dist/pwa-512x512.png'),
     autoHideMenuBar: true,
@@ -66,11 +67,9 @@ function createWindow() {
     },
   });
 
-  // Save window size/position whenever resized or moved with the mouse
   mainWindow.on('resize', saveCurrentBounds);
   mainWindow.on('move', saveCurrentBounds);
 
-  // Compact native menu with Always-on-Top and quick Window Size presets
   const menuTemplate = [
     {
       label: 'Window',
@@ -90,7 +89,7 @@ function createWindow() {
           label: 'Ultra-Slim Width (300px)',
           click: () => {
             if (mainWindow) {
-              const [, currentHeight] = mainWindow.getSize();
+              const [, currentHeight] = mainWindow.getContentSize();
               mainWindow.setContentSize(300, currentHeight);
             }
           },
@@ -99,7 +98,7 @@ function createWindow() {
           label: 'Slim Width (360px)',
           click: () => {
             if (mainWindow) {
-              const [, currentHeight] = mainWindow.getSize();
+              const [, currentHeight] = mainWindow.getContentSize();
               mainWindow.setContentSize(360, currentHeight);
             }
           },
@@ -108,7 +107,7 @@ function createWindow() {
           label: 'Medium Width (480px)',
           click: () => {
             if (mainWindow) {
-              const [, currentHeight] = mainWindow.getSize();
+              const [, currentHeight] = mainWindow.getContentSize();
               mainWindow.setContentSize(480, currentHeight);
             }
           },
@@ -149,7 +148,7 @@ ipcMain.on('set-window-width', (_event, targetWidth) => {
     mainWindow &&
     !mainWindow.isDestroyed() &&
     typeof targetWidth === 'number' &&
-    targetWidth >= 240
+    targetWidth >= 220
   ) {
     const [, currentHeight] = mainWindow.getContentSize();
     mainWindow.setContentSize(Math.round(targetWidth), currentHeight);
