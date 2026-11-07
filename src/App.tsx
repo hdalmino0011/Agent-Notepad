@@ -52,7 +52,7 @@ function usePWAInstall() {
     setIsIOS(/iphone|ipad|ipod/.test(userAgent));
 
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
+      // Do NOT call e.preventDefault() so the browser itself displays its native install prompt/icon
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 

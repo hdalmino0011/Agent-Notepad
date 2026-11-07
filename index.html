@@ -10,7 +10,6 @@
     <meta name="apple-mobile-web-app-title" content="NotepadPro" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
-    <link rel="manifest" href="./manifest.webmanifest" />
     <title>Call Center Notepad Pro</title>
     <meta name="description" content="An advanced, Microsoft Notepad-inspired workspace for call center agents featuring one-click scenario generators, structured notation templates, quick-line inserts, custom snippets, and persistent call checklists." />
     <meta property="og:title" content="Call Center Notepad Pro" />
@@ -24,28 +23,5 @@
   <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Automatic fallback for GitHub Pages when deployed directly from the repository root branch
-      window.addEventListener('DOMContentLoaded', function () {
-        setTimeout(function () {
-          var root = document.getElementById('root');
-          if (root && root.children.length === 0) {
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = './public/gh-bundle.css';
-            document.head.appendChild(link);
-
-            var script = document.createElement('script');
-            script.type = 'module';
-            script.src = './public/gh-bundle.js';
-            document.body.appendChild(script);
-
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.register('./sw.js').catch(function () {});
-            }
-          }
-        }, 120);
-      });
-    </script>
   </body>
 </html>
