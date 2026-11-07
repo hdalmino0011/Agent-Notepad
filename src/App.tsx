@@ -139,7 +139,7 @@ export interface CustomSnippet {
   text: string;
 }
 
-export type TemplateType = 1 | 2 | 3 | 4;
+export type TemplateType = 1 | 2 | 3 | 4 | 'free';
 
 export const CHECKLIST_ITEMS = [
   'REFUND FORM DONE',
@@ -156,8 +156,6 @@ export interface NoteEntry {
   text: string;
   checks: Record<ChecklistKey, boolean>;
 }
-
-const DIVIDER = '***************************';
 
 const DEFAULT_CHECKS: Record<ChecklistKey, boolean> = {
   'REFUND FORM DONE': false,
@@ -197,6 +195,13 @@ const TEMPLATE_META: Record<
     btnStyle:
       'bg-amber-600 hover:bg-amber-700 text-white border-amber-700 shadow-xs',
     activeRing: 'ring-2 ring-amber-400 dark:ring-amber-300',
+  },
+  free: {
+    label: 'Free Note',
+    badge: '+Add',
+    btnStyle:
+      'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-xs',
+    activeRing: 'ring-2 ring-rose-400 dark:ring-rose-300',
   },
 };
 
@@ -405,10 +410,12 @@ export default function App() {
     }
   });
 
-  // Last-selected Notation Template Type (1 | 2 | 3 | 4)
+  // Last-selected Notation Template Type (1 | 2 | 3 | 4 | 'free')
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>(() => {
     try {
-      const saved = Number(localStorage.getItem(STORAGE_KEYS.ACTIVE_TEMPLATE));
+      const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_TEMPLATE);
+      if (raw === 'free') return 'free';
+      const saved = Number(raw);
       if (saved === 1 || saved === 2 || saved === 3 || saved === 4) return saved;
     } catch {
       // ignore
@@ -425,6 +432,7 @@ export default function App() {
         if (Array.isArray(parsed)) {
           return parsed.map((entry: NoteEntry) => ({
             ...entry,
+            text: (entry.text || '').replace(/\n?\*{10,}\s*$/g, ''),
             checks: { ...DEFAULT_CHECKS, ...(entry.checks || {}) },
           }));
         }
@@ -433,13 +441,13 @@ export default function App() {
       const legacy = localStorage.getItem(STORAGE_KEYS.LEGACY_NOTES);
       if (legacy && legacy.trim()) {
         const rawBlocks = legacy
-          .split(DIVIDER)
+          .split(/\*{10,}/)
           .map((b) => b.trim())
           .filter(Boolean);
         return rawBlocks.map((b, idx) => ({
           id: `note-mig-${idx}-${Date.now()}`,
           templateType: 1,
-          text: `${b}\n${DIVIDER}`,
+          text: b,
           checks: { ...DEFAULT_CHECKS },
         }));
       }
@@ -484,9 +492,9 @@ export default function App() {
   const [containerWidth, setContainerWidth] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem(STORAGE_KEYS.CONTAINER_WIDTH));
-      return saved >= 300 ? saved : 400;
+      return saved >= 310 && saved <= 1200 ? saved : 360;
     } catch {
-      return 400;
+      return 360;
     }
   });
 
@@ -699,15 +707,19 @@ export default function App() {
   };
 
   /**
-   * Builds a Notation Template (Type 1 – Type 4) with:
-   * - "Campaign: " at the very start of Type 1, Type 3, and Type 4 (even before Agent Name)
-   * - Auto-filled Agent Name
-   * - Trailing 27-asterisk divider line (***************************)
+   * Builds a Notation Template (Type 1 – Type 4, or Free Note):
+   * - Type 1 & Type 3: "Campaign: " at the very start
+   * - Type 4: "Campaign: " directly below "Agent Name: "
+   * - Free Note ('free'): clean empty note without a notation template
    */
   const buildTemplateText = (
     type: TemplateType,
     reasonSentence = ''
   ): string => {
+    if (type === 'free') {
+      return reasonSentence;
+    }
+
     const cleanAgent = agentName.trim();
 
     let raw = '';
@@ -754,18 +766,18 @@ export default function App() {
         `Account Status: `,
       ].join('\n');
     } else {
-      // TYPE 4 (Transfer to Sales) — starts with Campaign: before everything else
+      // TYPE 4 (Transfer to Sales) — Campaign: is placed directly below Agent Name:
       raw = [
-        `Campaign: `,
         `Transferred to Sales: ${reasonSentence}`,
         `Email: `,
         `Customer Name: `,
         `Phone: `,
         `Agent Name: ${cleanAgent}`,
+        `Campaign: `,
       ].join('\n');
     }
 
-    return `${applyHeaderCasing(raw)}\n${DIVIDER}`;
+    return applyHeaderCasing(raw);
   };
 
   const pushUndoAndSetEntries = (
@@ -790,9 +802,9 @@ export default function App() {
   };
 
   /**
-   * Pressing a Notation Type button (Type 1 – Type 4):
-   * ALWAYS generates a new separate NoteEntry below existing notes (with its own
-   * ***************** divider and its own 4 clickable checklists below it).
+   * Pressing a Notation Type button (Type 1 – Type 4 or Free Note):
+   * ALWAYS generates a new separate NoteEntry below existing notes
+   * with its own 4 clickable checklists below it.
    * NEVER deletes or overwrites previous notes!
    */
   const handleGenerateNotationType = (type: TemplateType) => {
@@ -803,18 +815,18 @@ export default function App() {
       text: buildTemplateText(type, ''),
       checks: { ...DEFAULT_CHECKS },
     };
+    const label = type === 'free' ? 'Free Note' : `Type ${type} Notation`;
     pushUndoAndSetEntries(
       [...noteEntries, newEntry],
       newEntry.id,
-      `Generated Type ${type} Notation`
+      `Generated ${label}`
     );
   };
 
   /**
    * Clicking a Scenario Button:
-   * - If the user has an active/latest generated note whose REASON FOR CALLING:
-   *   line is empty (or if they clicked a scenario to populate the active note),
-   *   it fills REASON FOR CALLING: inside that note without deleting any notes.
+   * - If the user has an active/latest generated note, fills or appends to
+   *   REASON FOR CALLING: inside that note (or appends to a Free Note) without deleting any notes.
    * - If there are no notes yet (or if "Transfer to Sales" is clicked), it
    *   generates a new NoteEntry together with its 4 checklists below!
    */
@@ -826,7 +838,9 @@ export default function App() {
 
     const sentence = item.output ?? '';
     const targetType: TemplateType =
-      selectedTemplate === 4 ? 1 : selectedTemplate;
+      selectedTemplate === 4 || selectedTemplate === 'free'
+        ? 1
+        : selectedTemplate;
 
     if (noteEntries.length === 0) {
       const newEntry: NoteEntry = {
@@ -850,6 +864,21 @@ export default function App() {
         : noteEntries.length - 1;
 
     const targetNote = noteEntries[targetIndex];
+
+    if (targetNote.templateType === 'free') {
+      const trimmed = targetNote.text.trimEnd();
+      const updatedText = trimmed ? `${trimmed}\n${sentence}` : sentence;
+      const updatedEntries = noteEntries.map((entry, idx) =>
+        idx === targetIndex ? { ...entry, text: updatedText } : entry
+      );
+      pushUndoAndSetEntries(
+        updatedEntries,
+        targetNote.id,
+        `Added ${item.shortLabel} to Note #${targetIndex + 1}`
+      );
+      return;
+    }
+
     const reasonLineRegex =
       /^(REASON FOR CALLING|Reason for Calling):[ \t]*(.*)$/m;
 
@@ -894,7 +923,9 @@ export default function App() {
    */
   const handleQuickLineClick = (ql: (typeof QUICK_LINES)[number]) => {
     const targetType: TemplateType =
-      selectedTemplate === 4 ? 1 : selectedTemplate;
+      selectedTemplate === 4 || selectedTemplate === 'free'
+        ? 1
+        : selectedTemplate;
 
     let fieldRegex: RegExp;
     if (ql.field === 'threat') {
@@ -940,10 +971,8 @@ export default function App() {
         `Filled ${ql.label} in Note #${targetIndex + 1}`
       );
     } else {
-      const updatedText = `${targetNote.text.replace(
-        new RegExp(`${DIVIDER.replace(/\*/g, '\\*')}\\s*$`),
-        ''
-      )}${ql.label}\n${DIVIDER}`;
+      const trimmed = targetNote.text.trimEnd();
+      const updatedText = trimmed ? `${trimmed}\n${ql.label}` : ql.label;
       const updatedEntries = noteEntries.map((entry, idx) =>
         idx === targetIndex ? { ...entry, text: updatedText } : entry
       );
@@ -959,10 +988,7 @@ export default function App() {
   const appendLineToActiveNote = (lineText: string, label: string) => {
     if (noteEntries.length === 0) {
       const baseText = buildTemplateText(selectedTemplate, '');
-      const withLine = baseText.replace(
-        new RegExp(`${DIVIDER.replace(/\*/g, '\\*')}$`),
-        `${lineText}\n${DIVIDER}`
-      );
+      const withLine = baseText ? `${baseText}\n${lineText}` : lineText;
       const newEntry: NoteEntry = {
         id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         templateType: selectedTemplate,
@@ -978,11 +1004,8 @@ export default function App() {
         ? noteEntries.findIndex((n) => n.id === activeNoteId)
         : noteEntries.length - 1;
     const targetNote = noteEntries[targetIndex];
-    const withoutDivider = targetNote.text.replace(
-      new RegExp(`\\n?${DIVIDER.replace(/\*/g, '\\*')}\\s*$`),
-      ''
-    );
-    const updatedText = `${withoutDivider}\n${lineText}\n${DIVIDER}`;
+    const trimmed = targetNote.text.trimEnd();
+    const updatedText = trimmed ? `${trimmed}\n${lineText}` : lineText;
     const updatedEntries = noteEntries.map((entry, idx) =>
       idx === targetIndex ? { ...entry, text: updatedText } : entry
     );
@@ -1031,14 +1054,15 @@ export default function App() {
   const sanitizeForCopy = (rawText: string): string => {
     const checklistRegex =
       /^\s*(?:(?:\[[ xX✓✔]\]|[✓✔☑☐○•*-])\s*)?(?:REFUND FORM DONE|REQ FORM DONE|TRACKING FORM DONE|NOTES DONE)\s*$/i;
+    const dividerRegex = /^\s*\*{10,}\s*$/;
     return rawText
       .split('\n')
-      .filter((line) => !checklistRegex.test(line))
+      .filter((line) => !checklistRegex.test(line) && !dividerRegex.test(line))
       .join('\n')
       .trim();
   };
 
-  // Copy ALL notes (separated by *****************, checklists completely excluded)
+  // Copy ALL notes (checklists completely excluded)
   const handleCopyAllNotes = async () => {
     const combinedClean = noteEntries
       .map((entry) => sanitizeForCopy(entry.text))
@@ -1160,10 +1184,11 @@ export default function App() {
           RESIZABLE APPLICATION SHELL
           ===================================================================== */}
       <div
-        style={{
-          width: isVertical && containerWidth > 0 ? `${containerWidth}px` : '100%',
-          maxWidth: '100vw',
-        }}
+        style={
+          isVertical
+            ? { width: `${containerWidth}px`, maxWidth: '100vw' }
+            : { width: '100%' }
+        }
         className="relative h-full flex flex-col bg-white dark:bg-slate-900 border-r border-slate-300 dark:border-slate-800 shadow-xl"
       >
         {/* TOP COMPACT HEADER: Brand + PWA Install + Width/Layout Controls + Theme */}
@@ -1204,7 +1229,7 @@ export default function App() {
                 setLayoutMode('vertical');
                 setContainerWidth(360);
               }}
-              title="Slim Vertical (360px)"
+              title="Slim Column (360px)"
               className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors cursor-pointer ${
                 isVertical && containerWidth <= 380
                   ? 'border-blue-600 bg-blue-600 text-white'
@@ -1217,9 +1242,9 @@ export default function App() {
               type="button"
               onClick={() => {
                 setLayoutMode('vertical');
-                setContainerWidth(460);
+                setContainerWidth(480);
               }}
-              title="Medium Vertical (460px)"
+              title="Medium Column (480px)"
               className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors cursor-pointer ${
                 isVertical && containerWidth > 380
                   ? 'border-blue-600 bg-blue-600 text-white'
@@ -1287,10 +1312,10 @@ export default function App() {
             />
           </div>
 
-          {/* Small Color-Coded Notation Type Buttons (Type 1 – Type 4)
+          {/* Small Color-Coded Notation Type Buttons (Type 1 – Type 4 + Free Note)
               Each click generates a new separate note block below with its 4 checklists! */}
-          <div className="grid grid-cols-4 gap-1">
-            {([1, 2, 3, 4] as const).map((tNum) => {
+          <div className="grid grid-cols-5 gap-1">
+            {([1, 2, 3, 4, 'free'] as const).map((tNum) => {
               const meta = TEMPLATE_META[tNum];
               const isSelected = selectedTemplate === tNum;
               return (
@@ -1298,15 +1323,16 @@ export default function App() {
                   key={tNum}
                   type="button"
                   onClick={() => handleGenerateNotationType(tNum)}
-                  title={`Generate a new Type ${tNum} note block below with its 4 checklists (never deletes existing notes)`}
-                  className={`py-1 px-1.5 rounded border text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap ${
+                  title={
+                    tNum === 'free'
+                      ? 'Generate a clean empty Free Note block below with its 4 checklists'
+                      : `Generate a new Type ${tNum} note block below with its 4 checklists (never deletes existing notes)`
+                  }
+                  className={`py-1 px-1 rounded border text-[10.5px] font-bold flex items-center justify-center gap-0.5 transition-all cursor-pointer whitespace-nowrap ${
                     meta.btnStyle
                   } ${isSelected ? meta.activeRing : 'opacity-90 hover:opacity-100'}`}
                 >
                   <span>{meta.label}</span>
-                  <span className="text-[9px] font-normal opacity-90">
-                    {meta.badge}
-                  </span>
                 </button>
               );
             })}
@@ -1404,7 +1430,7 @@ export default function App() {
                 Support
               </button>
 
-              <div className="relative flex-1 min-w-[70px] ml-auto">
+              <div className="relative flex-1 min-w-[65px] ml-auto">
                 <Search className="w-2.5 h-2.5 text-slate-400 absolute left-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
@@ -1672,7 +1698,10 @@ export default function App() {
                       {/* Note Block Header Bar (Non-copyable metadata + Per-note Copy/Delete) */}
                       <div className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-[10px] select-none">
                         <span className="font-bold text-slate-700 dark:text-slate-300">
-                          Note #{idx + 1} · Type {entry.templateType}
+                          Note #{idx + 1} ·{' '}
+                          {entry.templateType === 'free'
+                            ? 'Free Note'
+                            : `Type ${entry.templateType}`}
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -1705,6 +1734,11 @@ export default function App() {
                       <textarea
                         value={entry.text}
                         rows={lineCount}
+                        placeholder={
+                          entry.templateType === 'free'
+                            ? 'Write your note here...'
+                            : undefined
+                        }
                         onFocus={() => setActiveNoteId(entry.id)}
                         onChange={(e) =>
                           handleNoteTextChange(entry.id, e.target.value)
