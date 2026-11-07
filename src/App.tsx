@@ -35,6 +35,15 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+declare global {
+  interface Window {
+    electronAPI?: {
+      isElectron?: boolean;
+      setWindowWidth?: (width: number) => void;
+    };
+  }
+}
+
 function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -489,10 +498,24 @@ export default function App() {
     }
   });
 
+  const isNativeDesktop =
+    typeof window !== 'undefined' &&
+    (Boolean(window.electronAPI?.isElectron) ||
+      window.navigator.userAgent.includes('Electron') ||
+      window.location.protocol === 'file:');
+
   const [containerWidth, setContainerWidth] = useState<number>(() => {
     try {
+      if (
+        typeof window !== 'undefined' &&
+        (Boolean(window.electronAPI?.isElectron) ||
+          window.navigator.userAgent.includes('Electron') ||
+          window.location.protocol === 'file:')
+      ) {
+        return Math.max(240, window.innerWidth || 360);
+      }
       const saved = Number(localStorage.getItem(STORAGE_KEYS.CONTAINER_WIDTH));
-      return saved >= 310 && saved <= 1200 ? saved : 360;
+      return saved >= 240 && saved <= 1600 ? saved : 360;
     } catch {
       return 360;
     }
@@ -501,7 +524,7 @@ export default function App() {
   const [topPaneHeight, setTopPaneHeight] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem(STORAGE_KEYS.TOP_PANE_HEIGHT));
-      return saved >= 110 && saved <= 500 ? saved : 210;
+      return saved >= 70 && saved <= 900 ? saved : 210;
     } catch {
       return 210;
     }
@@ -510,11 +533,21 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem(STORAGE_KEYS.SIDEBAR_WIDTH));
-      return saved >= 220 && saved <= 520 ? saved : 300;
+      return saved >= 160 && saved <= 900 ? saved : 300;
     } catch {
       return 300;
     }
   });
+
+  // In the native Windows .exe app, automatically track mouse window resizing
+  useEffect(() => {
+    if (!isNativeDesktop) return;
+    const handleNativeWindowResize = () => {
+      setContainerWidth(Math.max(240, window.innerWidth));
+    };
+    window.addEventListener('resize', handleNativeWindowResize);
+    return () => window.removeEventListener('resize', handleNativeWindowResize);
+  }, [isNativeDesktop]);
 
   const [customSnippets, setCustomSnippets] = useState<CustomSnippet[]>(() => {
     try {
@@ -632,17 +665,21 @@ export default function App() {
     }, 1800);
   };
 
-  // Drag resize handlers
+  // Drag resize handlers (supports both browser drag and native .exe mouse resizing)
   const startContainerWidthDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = containerWidth || window.innerWidth;
     const onMove = (moveEvent: MouseEvent) => {
+      const maxAllowed = isNativeDesktop ? 1920 : window.innerWidth;
       const next = Math.max(
-        300,
-        Math.min(window.innerWidth, startWidth + (moveEvent.clientX - startX))
+        240,
+        Math.min(maxAllowed, startWidth + (moveEvent.clientX - startX))
       );
       setContainerWidth(next);
+      if (isNativeDesktop && window.electronAPI?.setWindowWidth) {
+        window.electronAPI.setWindowWidth(next);
+      }
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
@@ -658,8 +695,8 @@ export default function App() {
     const startH = topPaneHeight;
     const onMove = (moveEvent: MouseEvent) => {
       const next = Math.max(
-        100,
-        Math.min(window.innerHeight - 200, startH + (moveEvent.clientY - startY))
+        70,
+        Math.min(window.innerHeight - 120, startH + (moveEvent.clientY - startY))
       );
       setTopPaneHeight(next);
     };
@@ -677,8 +714,11 @@ export default function App() {
     const startW = sidebarWidth;
     const onMove = (moveEvent: MouseEvent) => {
       const next = Math.max(
-        220,
-        Math.min(540, startW + (moveEvent.clientX - startX))
+        160,
+        Math.min(
+          Math.max(400, window.innerWidth - 160),
+          startW + (moveEvent.clientX - startX)
+        )
       );
       setSidebarWidth(next);
     };
@@ -1252,6 +1292,9 @@ export default function App() {
               onClick={() => {
                 setLayoutMode('vertical');
                 setContainerWidth(360);
+                if (isNativeDesktop && window.electronAPI?.setWindowWidth) {
+                  window.electronAPI.setWindowWidth(360);
+                }
               }}
               title="Slim Column (360px)"
               className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors cursor-pointer ${
@@ -1267,6 +1310,9 @@ export default function App() {
               onClick={() => {
                 setLayoutMode('vertical');
                 setContainerWidth(480);
+                if (isNativeDesktop && window.electronAPI?.setWindowWidth) {
+                  window.electronAPI.setWindowWidth(480);
+                }
               }}
               title="Medium Column (480px)"
               className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors cursor-pointer ${
