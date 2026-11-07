@@ -85,6 +85,10 @@ function createWindow() {
           },
         },
         { type: 'separator' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { role: 'resetZoom' },
+        { type: 'separator' },
         {
           label: 'Ultra-Slim Width (300px)',
           click: () => {

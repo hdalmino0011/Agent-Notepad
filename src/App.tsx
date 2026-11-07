@@ -40,6 +40,8 @@ declare global {
     electronAPI?: {
       isElectron?: boolean;
       setWindowWidth?: (width: number) => void;
+      setZoomFactor?: (factor: number) => void;
+      getZoomFactor?: () => number;
     };
   }
 }
@@ -403,6 +405,7 @@ const STORAGE_KEYS = {
   CONTAINER_WIDTH: 'ccnp_container_width',
   TOP_PANE_HEIGHT: 'ccnp_top_pane_height',
   SIDEBAR_WIDTH: 'ccnp_sidebar_width',
+  UI_ZOOM: 'ccnp_ui_zoom',
 };
 
 export default function App() {
@@ -536,6 +539,16 @@ export default function App() {
   // Optional custom heights per note id when resized with the mouse
   const [noteHeights, setNoteHeights] = useState<Record<string, number>>({});
 
+  // Persisted UI Zoom level controlled by Ctrl + Mouse Scroll (or Ctrl + +/-/0)
+  const [uiZoom, setUiZoom] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem(STORAGE_KEYS.UI_ZOOM));
+      return saved >= 0.4 && saved <= 2.0 ? saved : 1;
+    } catch {
+      return 1;
+    }
+  });
+
   const [customSnippets, setCustomSnippets] = useState<CustomSnippet[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.SNIPPETS);
@@ -641,6 +654,52 @@ export default function App() {
       // ignore
     }
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.UI_ZOOM, String(uiZoom));
+    } catch {
+      // ignore
+    }
+    if (window.electronAPI?.setZoomFactor) {
+      window.electronAPI.setZoomFactor(uiZoom);
+    }
+  }, [uiZoom]);
+
+  // Ctrl + Mouse Wheel Scroll Zoom & Ctrl + (+ / - / 0) Keyboard Zoom
+  useEffect(() => {
+    const handleWheelZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.05 : -0.05;
+        setUiZoom((prev) => {
+          const next = Math.round(Math.max(0.4, Math.min(2.0, prev + delta)) * 100) / 100;
+          return next;
+        });
+      }
+    };
+
+    const handleKeyDownZoom = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        setUiZoom((prev) => Math.round(Math.min(2.0, prev + 0.05) * 100) / 100);
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        setUiZoom((prev) => Math.round(Math.max(0.4, prev - 0.05) * 100) / 100);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        setUiZoom(1);
+      }
+    };
+
+    window.addEventListener('wheel', handleWheelZoom, { passive: false });
+    window.addEventListener('keydown', handleKeyDownZoom);
+    return () => {
+      window.removeEventListener('wheel', handleWheelZoom);
+      window.removeEventListener('keydown', handleKeyDownZoom);
+    };
+  }, []);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -1350,14 +1409,17 @@ export default function App() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-200/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-start select-none">
       {/* =====================================================================
-          RESIZABLE APPLICATION SHELL
+          RESIZABLE APPLICATION SHELL (Supports Ctrl + Mouse Scroll Zoom)
           ===================================================================== */}
       <div
         style={{
           width: isVertical ? `${containerWidth}px` : '100%',
-          maxWidth: '100vw',
-          height: containerHeight ? `${containerHeight}px` : '100%',
-          maxHeight: '100vh',
+          maxWidth: `${100 / uiZoom}vw`,
+          height: containerHeight
+            ? `${containerHeight}px`
+            : `${100 / uiZoom}vh`,
+          maxHeight: `${100 / uiZoom}vh`,
+          zoom: uiZoom,
         }}
         className="relative flex flex-col bg-white dark:bg-slate-900 border-r border-b border-slate-300 dark:border-slate-800 shadow-xl"
       >
