@@ -1,0 +1,6 @@
+{
+  "name": "Call Center Notepad Pro",
+  "description": "An advanced, Microsoft Notepad-inspired workspace for call center agents featuring one-click scenario generators, structured notation templates, quick-line inserts, custom snippets, and persistent call checklists.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
