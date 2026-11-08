@@ -501,22 +501,7 @@ export default function App() {
     }
   });
 
-  const isNativeDesktop =
-    typeof window !== 'undefined' &&
-    (Boolean(window.electronAPI?.isElectron) ||
-      window.navigator.userAgent.includes('Electron') ||
-      window.location.protocol === 'file:');
 
-  const [containerWidth, setContainerWidth] = useState<number>(() => {
-    try {
-      const saved = Number(localStorage.getItem(STORAGE_KEYS.CONTAINER_WIDTH));
-      return saved >= 220 && saved <= 1800 ? saved : 360;
-    } catch {
-      return 360;
-    }
-  });
-
-  const [containerHeight, setContainerHeight] = useState<number | null>(null);
 
   const [topPaneHeight, setTopPaneHeight] = useState<number>(() => {
     try {
@@ -631,13 +616,7 @@ export default function App() {
     }
   }, [layoutMode]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.CONTAINER_WIDTH, String(containerWidth));
-    } catch {
-      // ignore
-    }
-  }, [containerWidth]);
+
 
   useEffect(() => {
     try {
@@ -712,97 +691,6 @@ export default function App() {
   };
 
   // Pointer-captured drag resize handlers so mouse dragging never loses focus
-  const startContainerWidthDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const target = e.currentTarget;
-    target.setPointerCapture(e.pointerId);
-    const startX = e.clientX;
-    const startWidth = containerWidth || window.innerWidth;
-
-    const onMove = (moveEvent: PointerEvent) => {
-      const next = Math.max(
-        220,
-        Math.min(window.innerWidth, startWidth + (moveEvent.clientX - startX))
-      );
-      setContainerWidth(next);
-    };
-    const onUp = (upEvent: PointerEvent) => {
-      if (target.hasPointerCapture(upEvent.pointerId)) {
-        target.releasePointerCapture(upEvent.pointerId);
-      }
-      target.removeEventListener('pointermove', onMove);
-      target.removeEventListener('pointerup', onUp);
-      target.removeEventListener('pointercancel', onUp);
-    };
-    target.addEventListener('pointermove', onMove);
-    target.addEventListener('pointerup', onUp);
-    target.addEventListener('pointercancel', onUp);
-  };
-
-  const startContainerHeightDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const target = e.currentTarget;
-    target.setPointerCapture(e.pointerId);
-    const startY = e.clientY;
-    const startHeight = containerHeight || window.innerHeight;
-
-    const onMove = (moveEvent: PointerEvent) => {
-      const next = Math.max(
-        260,
-        Math.min(window.innerHeight, startHeight + (moveEvent.clientY - startY))
-      );
-      setContainerHeight(next);
-    };
-    const onUp = (upEvent: PointerEvent) => {
-      if (target.hasPointerCapture(upEvent.pointerId)) {
-        target.releasePointerCapture(upEvent.pointerId);
-      }
-      target.removeEventListener('pointermove', onMove);
-      target.removeEventListener('pointerup', onUp);
-      target.removeEventListener('pointercancel', onUp);
-    };
-    target.addEventListener('pointermove', onMove);
-    target.addEventListener('pointerup', onUp);
-    target.addEventListener('pointercancel', onUp);
-  };
-
-  const startContainerCornerDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const target = e.currentTarget;
-    target.setPointerCapture(e.pointerId);
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startWidth = containerWidth || window.innerWidth;
-    const startHeight = containerHeight || window.innerHeight;
-
-    const onMove = (moveEvent: PointerEvent) => {
-      const nextW = Math.max(
-        220,
-        Math.min(window.innerWidth, startWidth + (moveEvent.clientX - startX))
-      );
-      const nextH = Math.max(
-        260,
-        Math.min(window.innerHeight, startHeight + (moveEvent.clientY - startY))
-      );
-      setContainerWidth(nextW);
-      setContainerHeight(nextH);
-    };
-    const onUp = (upEvent: PointerEvent) => {
-      if (target.hasPointerCapture(upEvent.pointerId)) {
-        target.releasePointerCapture(upEvent.pointerId);
-      }
-      target.removeEventListener('pointermove', onMove);
-      target.removeEventListener('pointerup', onUp);
-      target.removeEventListener('pointercancel', onUp);
-    };
-    target.addEventListener('pointermove', onMove);
-    target.addEventListener('pointerup', onUp);
-    target.addEventListener('pointercancel', onUp);
-  };
-
   const startTopPaneHeightDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -812,7 +700,7 @@ export default function App() {
     const startH = topPaneHeight;
 
     const onMove = (moveEvent: PointerEvent) => {
-      const maxH = Math.max(120, (containerHeight || window.innerHeight) - 110);
+      const maxH = Math.max(120, window.innerHeight - 110);
       const next = Math.max(
         60,
         Math.min(maxH, startH + (moveEvent.clientY - startY))
@@ -1409,21 +1297,17 @@ export default function App() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-200/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex justify-start select-none">
       {/* =====================================================================
-          RESIZABLE APPLICATION SHELL (Supports Ctrl + Mouse Scroll Zoom)
+          FULL-WINDOW APPLICATION SHELL (Zero blank space on the sides)
           ===================================================================== */}
       <div
         style={{
-          width: isVertical ? `${containerWidth}px` : '100%',
-          maxWidth: `${100 / uiZoom}vw`,
-          height: containerHeight
-            ? `${containerHeight}px`
-            : `${100 / uiZoom}vh`,
-          maxHeight: `${100 / uiZoom}vh`,
+          width: `${100 / uiZoom}vw`,
+          height: `${100 / uiZoom}vh`,
           zoom: uiZoom,
         }}
-        className="relative flex flex-col bg-white dark:bg-slate-900 border-r border-b border-slate-300 dark:border-slate-800 shadow-xl"
+        className="relative flex flex-col bg-white dark:bg-slate-900"
       >
-        {/* TOP COMPACT HEADER: Brand + PWA Install + Width/Layout Controls + Theme */}
+        {/* TOP COMPACT HEADER: Brand + PWA Install + Layout Controls + Theme */}
         <header className="shrink-0 px-2.5 py-1.5 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
             <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
@@ -1455,42 +1339,6 @@ export default function App() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setLayoutMode('vertical');
-                setContainerWidth(360);
-                if (isNativeDesktop && window.electronAPI?.setWindowWidth) {
-                  window.electronAPI.setWindowWidth(360);
-                }
-              }}
-              title="Slim Column (360px)"
-              className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors cursor-pointer ${
-                isVertical && containerWidth <= 380
-                  ? 'border-blue-600 bg-blue-600 text-white'
-                  : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              Slim
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLayoutMode('vertical');
-                setContainerWidth(480);
-                if (isNativeDesktop && window.electronAPI?.setWindowWidth) {
-                  window.electronAPI.setWindowWidth(480);
-                }
-              }}
-              title="Medium Column (480px)"
-              className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border transition-colors cursor-pointer ${
-                isVertical && containerWidth > 380
-                  ? 'border-blue-600 bg-blue-600 text-white'
-                  : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              Med
-            </button>
             <button
               type="button"
               onClick={() =>
@@ -2059,33 +1907,6 @@ export default function App() {
               <span>PWA Ready · Drag edge to resize</span>
             </footer>
           </div>
-        </div>
-
-        {/* DRAGGABLE RIGHT-EDGE WIDTH HANDLE */}
-        {isVertical && (
-          <div
-            onPointerDown={startContainerWidthDrag}
-            title="Drag left or right with mouse to resize tool width"
-            className="absolute top-0 right-0 w-2.5 h-full cursor-ew-resize bg-transparent hover:bg-blue-500/40 active:bg-blue-600/60 flex items-center justify-center group z-30 touch-none"
-          >
-            <div className="w-1 h-12 bg-slate-400/70 dark:bg-slate-600 group-hover:bg-blue-500 rounded-full pointer-events-none" />
-          </div>
-        )}
-
-        {/* DRAGGABLE BOTTOM-EDGE HEIGHT HANDLE */}
-        <div
-          onPointerDown={startContainerHeightDrag}
-          title="Drag up or down with mouse to resize tool height"
-          className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize bg-transparent hover:bg-blue-500/40 active:bg-blue-600/60 z-30 touch-none"
-        />
-
-        {/* DRAGGABLE BOTTOM-RIGHT CORNER 2D HANDLE */}
-        <div
-          onPointerDown={startContainerCornerDrag}
-          title="Drag corner diagonally to resize both width and height"
-          className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize bg-slate-300/80 dark:bg-slate-700/80 hover:bg-blue-500 z-40 rounded-tl flex items-center justify-center touch-none"
-        >
-          <div className="w-1.5 h-1.5 border-r-2 border-b-2 border-slate-600 dark:border-slate-200 pointer-events-none" />
         </div>
 
         {/* iOS PWA Installation Guide Modal */}
